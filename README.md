@@ -1,3 +1,3 @@
-# pkgbuild-template
+# gitrepo
 
-Package description
+Wrapper git para o CommunityBig
