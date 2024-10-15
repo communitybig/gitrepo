@@ -15,7 +15,7 @@ pkgver=$(date +%Y.%m.%d)
 pkgrel=$(date +%H%M)
 arch=('any')
 license=('MIT')
-url="https://github.com/vcatafesta/${pkgname}"
+url="https://github.com/communitybig/${pkgname}"
 source=("git+${url}.git")
 md5sums=('SKIP')
 
