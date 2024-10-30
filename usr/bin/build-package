@@ -4,7 +4,7 @@
 #
 #  build-package - Wrapper git para o BigCommunity
 #  Created: qui 05 set 2024 00:51:12 -04
-#  Altered: qua 09 out 2024 21:31:59 -04
+#  Altered: ter 29 out 2024 21:00:23 -04
 #
 #  Copyright (c) 2024-2024, Tales A. Mendonça <talesam@gmail.com>
 #  Copyright (c) 2024-2024, Vilmar Catafesta <vcatafesta@gmail.com>
@@ -33,7 +33,7 @@
 # system
 declare APP="${0##*/}"
 declare APPDESC="Wrapper git para o BigCommunity"
-declare VERSION="2.1.3" # Versão do script
+declare VERSION="2.1.5" # Versão do script
 : "${reset=$(tput sgr0)}"
 : "${red=$(tput bold)$(tput setaf 196)}"
 LIBRARY=${LIBRARY:-"/usr/share/community/gitrepo/shell"}
@@ -55,6 +55,7 @@ sh_usage() {
 		      -a|--aur              ${orange}<pacote> ${cyan} # Construir pacote do AUR ${yellow}obrigátorio nome do pacote para construir ${reset}
 		      -n|--nocolor                   ${cyan} # Suprime a impressão de cores ${reset}
 		      -V|--version                   ${cyan} # Imprime a versão do aplicativo ${reset}
+		      -t|--tmate                     ${cyan} # Ativa o tmate para debug ${yellow}(default: disable)${reset}
 		      -h|--help                      ${cyan} # Mostra este Help ${reset}
 	EOF
 }
@@ -86,6 +87,10 @@ parse_parameters() {
 
 	while [[ $# -gt 0 ]]; do
 		case $1 in
+		-t | --tmate)
+      tmate_option="true"
+			shift # past argument
+			;;
 		-n | --nocolor)
 			unset_varcolors
 			shift # past argument
@@ -185,7 +190,6 @@ trigger_workflow() {
 	local event_type
 	local response
 	local repo_name
-	local tmate_option="false"
 
 	p_log "$CYAN" "Acionando o workflow de build no GitHub..."
 	if [[ -n "$aur_package" ]]; then
@@ -214,7 +218,8 @@ trigger_workflow() {
       \"client_payload\": { \
       \"branch\": \"${new_branch}\", \
       \"branch_type\": \"${branch_type}\", \
-      \"url\": \"https://github.com/${repo_name}\" \
+      \"url\": \"https://github.com/${repo_name}\", \
+      \"tmate\": $tmate_option \
       }\
     }"
 		event_type="package-build"
@@ -260,6 +265,7 @@ sh_configure_environment() {
 	p_log "$BLUE" "Configurando ambiente"
 	declare -g IS_GIT_REPO="$(check_repo_is_git)"
 	declare -g IS_AUR_PACKAGE=false
+	declare -g tmate_option="false"
 
 	checkDependencies
 	parse_parameters "$@"
@@ -319,15 +325,12 @@ Construir_pacote_do_AUR() {
 
 menu_advanced() {
 	while true; do
-		# Menu principal
-		if $IS_GIT_REPO; then
-			create_menu "Escolha uma ação:" \
-		    "Excluir todos os branchs locais e remoto (exceto main, e os últimos testing, stable e extra)" \
-				"Excluir todos os Action jobs com falhas no remoto  : $(get_organization_repo_name)" \
-				"Excluir todos os Action jobs com sucesso no remoto : $(get_organization_repo_name)" \
-				"Apagar todas a tags no remoto : $(get_organization_repo_name)" \
-				"Voltar"
-		fi
+		create_menu "Escolha uma ação:" \
+	    "Excluir todos os branchs locais e remoto (exceto main, e os últimos testing, stable e extra)" \
+			"Excluir todos os Action jobs com falhas no remoto  : $(get_organization_repo_name)" \
+			"Excluir todos os Action jobs com sucesso no remoto : $(get_organization_repo_name)" \
+			"Apagar todas a tags no remoto : $(get_organization_repo_name)" \
+			"Voltar"
 		ACTION=$MENU_RESULT
 		case "$ACTION" in
 		"Excluir todos os branchs locais e remoto (exceto main, e os últimos testing, stable e extra)")
