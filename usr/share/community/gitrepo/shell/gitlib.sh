@@ -497,7 +497,7 @@ create_menu_with_array() {
       echo -e "Iso-Profiles   : ${cyan}$ISO_PROFILES_REPO ${reset}"
       echo -e "Br Manjaro     : ${cyan}$MANJARO_BRANCH ${reset}"
       echo -e "Br BigLinux    : ${cyan}$BIGLINUX_BRANCH ${reset}"
-      echo -e "Br BigCommunity: ${cyan}$COMMUNITYBIG_BRANCH ${reset}"
+      echo -e "Br BigCommunity: ${cyan}$BIGCOMMUNITY_BRANCH ${reset}"
       echo -e "Br ChiliLinux  : ${cyan}$CHILILINUX_BRANCH ${reset}"
       echo -e "Kernel         : ${cyan}$KERNEL ${reset}"
 			echo '---------------------------------------------------------------------------------'
@@ -592,7 +592,7 @@ create_menu() {
       echo -e "Iso-Profiles   : ${cyan}$ISO_PROFILES_REPO ${reset}"
       echo -e "Br Manjaro     : ${cyan}$MANJARO_BRANCH ${reset}"
       echo -e "Br BigLinux    : ${cyan}$BIGLINUX_BRANCH ${reset}"
-      echo -e "Br BigCommunity: ${cyan}$COMMUNITYBIG_BRANCH ${reset}"
+      echo -e "Br BigCommunity: ${cyan}$BIGCOMMUNITY_BRANCH ${reset}"
       echo -e "Br ChiliLinux  : ${cyan}$CHILILINUX_BRANCH ${reset}"
       echo -e "Kernel         : ${cyan}$KERNEL ${reset}"
 			echo '---------------------------------------------------------------------------------'
