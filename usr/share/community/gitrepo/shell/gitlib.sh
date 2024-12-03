@@ -4,7 +4,7 @@
 #
 #  /usr/share/community/gitrepo/shell/gitlib.sh - lib for gitrepo.sh and buildiso.sh
 #  Created: qui 05 set 2024 00:51:12 -04
-#  Altered: sex 08 nov 2024 12:55:55 -04
+#  Altered: dom 01 dez 2024 10:12:36 -04
 #
 #  Copyright (c) 2024-2024, Tales A. Mendonça <talesam@gmail.com>
 #  Copyright (c) 2024-2024, Vilmar Catafesta <vcatafesta@gmail.com>
@@ -32,8 +32,8 @@
 ##############################################################################
 declare distro="$(uname -n)"
 readonly DEPENDENCIES=('git' 'tput')
-readonly organizations=("communitybig" "chililinux" "biglinux" "talesam" "vcatafesta")
-readonly branchs=("testing" "stable" "extra")
+readonly organizations=('communitybig' 'biglinux' 'chililinux' 'talesam' 'vcatafesta')
+readonly branchs=('testing' 'stable' 'extra')
 shopt -s extglob # Habilita o uso de padrões estendidos (extglob)
 
 # Funções auxiliares
@@ -46,11 +46,11 @@ conf() {
 check_param_org() {
 	local value_organization="$1"
 	if [[ ! " ${organizations[@]} " =~ " $value_organization " ]]; then
-		die "$RED" "Erro fatal: Valor inválido para o parâmetro ${YELLOW}'-o|--organization|--org' ${RESET};
-${INFO}São válidos: ${organizations[*]}
+		die "$RED" "Erro fatal: Valor inválido para o parâmetro ${YELLOW}'-o|--org|--organization' ${RESET};
+${INFO}São válidos: ${orange}${organizations[*]}${reset}
 ${CYAN}ex.: $APP -o communitybig
-     $APP --org talesam
-     $APP --organization vcatafesta${RESET}"
+     $APP --org biglinux
+     $APP --organization chililinux${RESET}"
 	fi
 }
 
@@ -68,7 +68,7 @@ check_valid_token() {
 	#echo $TOKEN_RELEASE
 	p_log "${cyan}" "Verificando permissões do token GitHub..."
 	token_check=$(curl -s -H "Authorization: token $TOKEN_RELEASE" https://api.github.com/user)
-	GITHUB_USER_NAME="$(echo "$token_check" | jq .login)"
+	GITHUB_USER_NAME="$(echo "$token_check" | jq -r .login)"
 	p_log "$cyan" "Token verificado: ${yellow}$GITHUB_USER_NAME"
 
 	if [[ -z "$(echo "$token_check" | jq .login)" ]]; then
@@ -112,8 +112,9 @@ gettokengithub_by_key() {
 
 get_token_release() {
 	declare -g TOKEN_RELEASE
-	if [[ ! -e "$CFILETOKEN" ]]; then
-		die "$RED" "Erro: Não foi possível ler o arquivo $CFILETOKEN"
+	if [[ ! -r "$CFILETOKEN" ]]; then
+    #die "$RED" "Erro: Não foi possível ler o arquivo $CFILETOKEN"
+    print_message_and_exit
 	fi
 
 	#	TOKEN_RELEASE="$(gettokengithub_by_line)"
@@ -443,9 +444,113 @@ get_git_last_commit_url() {
 }
 
 ###############################################################################################################################################
+create_menu_with_array() {
+  local title=$1
+  local -a options=("${!2}") # Recebe o array de opções
+  local default=${3:-}       # Opção padrão, se fornecida
+  local selected=0
+  local key
+
+  # Define a opção padrão como selecionada inicialmente
+  if [[ -n "$default" ]]; then
+    for i in "${!options[@]}"; do
+      if [[ "${options[$i]}" == "$default" ]]; then
+        selected=$i
+        break
+      fi
+    done
+  fi
+
+	tput civis # Esconde o cursor
+
+	while true; do
+		tput clear # Limpa a tela
+		if $IS_GIT_REPO; then
+			echo '---------------------------------------------------------------------------------'
+			echo -e "Organization   : ${CYAN}$ORGANIZATION${RESET}"
+			echo -e "Repo Name      : ${CYAN}$REPO_NAME${RESET}"
+			echo -e "User Name      : ${CYAN}$GITHUB_USER_NAME${RESET}"
+			echo -e "Repo Workflow  : ${CYAN}$REPO_WORKFLOW${RESET}"
+			echo -e "Local Path     : ${CYAN}$REPO_PATH${RESET}"
+			echo -e "Branchs        : \n${RED}$(git branch 2>/dev/null)${RESET}"
+			git remote -v 2>/dev/null
+			echo '---------------------------------------------------------------------------------'
+		elif $IS_AUR_PACKAGE; then
+			echo '---------------------------------------------------------------------------------'
+			echo -e "Organization   : ${CYAN}$ORGANIZATION${RESET}"
+			echo -e "Repo Workflow  : ${CYAN}$REPO_WORKFLOW${RESET}"
+			echo -e "User Name      : ${CYAN}$GITHUB_USER_NAME${RESET}"
+			echo -e "Local Path     : ${CYAN}$REPO_PATH${RESET}"
+			echo '---------------------------------------------------------------------------------'
+		elif $IS_BUILD_ISO; then
+			echo '---------------------------------------------------------------------------------'
+			echo -e "Organization   : ${CYAN}$ORGANIZATION${RESET}"
+			echo -e "Repo Workflow  : ${CYAN}$REPO_WORKFLOW${RESET}"
+			echo -e "User Name      : ${CYAN}$GITHUB_USER_NAME${RESET}"
+			echo -e "Local Path     : ${CYAN}$REPO_PATH${RESET}"
+			echo '---------------------------------------------------------------------------------'
+		fi
+
+		if $IS_BUILD_ISO_RESUME; then
+      echo -e "Distroname     : ${cyan}$DISTRONAME ${reset}"
+      echo -e "Edition        : ${cyan}$EDITION ${reset}"
+      echo -e "Iso-Profiles   : ${cyan}$ISO_PROFILES_REPO ${reset}"
+      echo -e "Br Manjaro     : ${cyan}$MANJARO_BRANCH ${reset}"
+      echo -e "Br BigLinux    : ${cyan}$BIGLINUX_BRANCH ${reset}"
+      echo -e "Br BigCommunity: ${cyan}$COMMUNITYBIG_BRANCH ${reset}"
+      echo -e "Br ChiliLinux  : ${cyan}$CHILILINUX_BRANCH ${reset}"
+      echo -e "Kernel         : ${cyan}$KERNEL ${reset}"
+			echo '---------------------------------------------------------------------------------'
+    fi
+		echo -e "${BLUE}${BOLD}$title${NC}\n"
+
+		for i in "${!options[@]}"; do
+			if [[ "$i" -eq $selected ]]; then
+				if [[ "${options[$i]}" =~ ^(Sair|Voltar)$ ]]; then
+          if [[ "$ORGANIZATION" =~ ^(chililinux|vcatafesta)$ ]]; then
+  					echo -e "${RED}${BOLD}${reverse}> ${options[$i]}${NC}"
+  				else
+					  echo -e "${RED}${BOLD}> ${options[$i]}${NC}"
+				  fi
+				else
+          if [[ "$ORGANIZATION" =~ ^(chililinux|vcatafesta)$ ]]; then
+  					echo -e "${GREEN}${BOLD}${reverse}> ${options[$i]}${NC}"
+  				else
+	  				echo -e "${GREEN}${BOLD}> ${options[$i]}${NC}"
+	  			fi
+				fi
+			else
+				if [[ "${options[$i]}" =~ ^(Sair|Voltar)$ ]]; then
+					echo -e "${RED}  ${options[$i]}${NC}"
+				else
+					echo "  ${options[$i]}"
+				fi
+			fi
+		done
+
+		read -rsn1 key
+		case "$key" in
+		A)
+			((selected--))
+			[ $selected -lt 0 ] && selected=$((${#options[@]} - 1))
+			;;
+		B)
+			((selected++))
+			[ $selected -eq ${#options[@]} ] && selected=0
+			;;
+		'') break ;;
+		esac
+	done
+
+	tput cnorm # Mostra o cursor novamente
+	echo -e "\nVocê selecionou: ${GREEN}${BOLD}${options[$selected]}${NC}"
+	MENU_RESULT=${options[$selected]}
+	#	return $((selected+1))
+}
+
 create_menu() {
 	local title=$1
-	shift
+  shift # Avança apenas o título
 	#	local options=("$@" "Sair")
 	local options=("$@")
 	local selected=0
@@ -457,29 +562,41 @@ create_menu() {
 		tput clear # Limpa a tela
 		if $IS_GIT_REPO; then
 			echo '---------------------------------------------------------------------------------'
-			echo -e "Organization  : ${CYAN}$ORGANIZATION${RESET}"
-			echo -e "Repo Name     : ${CYAN}$REPO_NAME${RESET}"
-			echo -e "User Name     : ${CYAN}$GITHUB_USER_NAME${RESET}"
-			echo -e "Repo Workflow : ${CYAN}$REPO${RESET}"
-			echo -e "Local Path    : ${CYAN}$REPO_PATH${RESET}"
-			echo -e "Branchs       : \n${RED}$(git branch 2>/dev/null)${RESET}"
+			echo -e "Organization   : ${CYAN}$ORGANIZATION${RESET}"
+			echo -e "Repo Name      : ${CYAN}$REPO_NAME${RESET}"
+			echo -e "User Name      : ${CYAN}$GITHUB_USER_NAME${RESET}"
+			echo -e "Repo Workflow  : ${CYAN}$REPO_WORKFLOW${RESET}"
+			echo -e "Local Path     : ${CYAN}$REPO_PATH${RESET}"
+			echo -e "Branchs        : \n${RED}$(git branch 2>/dev/null)${RESET}"
 			git remote -v 2>/dev/null
 			echo '---------------------------------------------------------------------------------'
 		elif $IS_AUR_PACKAGE; then
 			echo '---------------------------------------------------------------------------------'
-			echo -e "Organization  : ${CYAN}$ORGANIZATION${RESET}"
-			echo -e "Repo Workflow : ${CYAN}$REPO${RESET}"
-			echo -e "User Name     : ${CYAN}$GITHUB_USER_NAME${RESET}"
-			echo -e "Local Path    : ${CYAN}$REPO_PATH${RESET}"
+			echo -e "Organization   : ${CYAN}$ORGANIZATION${RESET}"
+			echo -e "Repo Workflow  : ${CYAN}$REPO_WORKFLOW${RESET}"
+			echo -e "User Name      : ${CYAN}$GITHUB_USER_NAME${RESET}"
+			echo -e "Local Path     : ${CYAN}$REPO_PATH${RESET}"
 			echo '---------------------------------------------------------------------------------'
 		elif $IS_BUILD_ISO; then
 			echo '---------------------------------------------------------------------------------'
-			echo -e "Organization  : ${CYAN}$ORGANIZATION${RESET}"
-			echo -e "Repo Workflow : ${CYAN}$REPO${RESET}"
-			echo -e "User Name     : ${CYAN}$GITHUB_USER_NAME${RESET}"
-			echo -e "Local Path    : ${CYAN}$REPO_PATH${RESET}"
+			echo -e "Organization   : ${CYAN}$ORGANIZATION${RESET}"
+			echo -e "Repo Workflow  : ${CYAN}$REPO_WOKFLOW${RESET}"
+			echo -e "User Name      : ${CYAN}$GITHUB_USER_NAME${RESET}"
+			echo -e "Local Path     : ${CYAN}$REPO_PATH${RESET}"
 			echo '---------------------------------------------------------------------------------'
 		fi
+
+		if $IS_BUILD_ISO_RESUME; then
+      echo -e "Distroname     : ${cyan}$DISTRONAME ${reset}"
+      echo -e "Edition        : ${cyan}$EDITION ${reset}"
+      echo -e "Iso-Profiles   : ${cyan}$ISO_PROFILES_REPO ${reset}"
+      echo -e "Br Manjaro     : ${cyan}$MANJARO_BRANCH ${reset}"
+      echo -e "Br BigLinux    : ${cyan}$BIGLINUX_BRANCH ${reset}"
+      echo -e "Br BigCommunity: ${cyan}$COMMUNITYBIG_BRANCH ${reset}"
+      echo -e "Br ChiliLinux  : ${cyan}$CHILILINUX_BRANCH ${reset}"
+      echo -e "Kernel         : ${cyan}$KERNEL ${reset}"
+			echo '---------------------------------------------------------------------------------'
+    fi
 		echo -e "${BLUE}${BOLD}$title${NC}\n"
 
 		for i in "${!options[@]}"; do
@@ -596,7 +713,8 @@ create_branch_and_push() {
 	local branch_type="$1"
 	declare -g new_branch
 
-	new_branch="${branch_type}-$(date +%Y-%m-%d_%H-%M)"
+	#new_branch="${branch_type}-$(date +%Y-%m-%d_%H-%M)"
+	new_branch="${branch_type}-$(date +%Y%m%d_%H%M%S)"
 	p_log "$CYAN" "Atualizando o branch main..."
 
 	# Certifique-se de estar no branch main e atualize-o
@@ -638,7 +756,7 @@ get_url_actions() {
 	runs=$(curl -s -X GET \
 		-H "Accept: application/vnd.github.v3+json" \
 		-H "Authorization: token $TOKEN_RELEASE" \
-		"https://api.github.com/repos/${REPO}/actions/runs")
+		"https://api.github.com/repos/${REPO_WORKFLOW}/actions/runs")
 
 	# Obter o ID da execução mais recente
 	run_id=$(echo "$runs" | jq '.workflow_runs | sort_by(.id) | last | .id')
@@ -649,7 +767,7 @@ get_url_actions() {
 	fi
 
 	# Construir a URL da action
-	action_url="https://github.com/${REPO}/actions/runs/$run_id"
+	action_url="https://github.com/${REPO_WORKFLOW}/actions/runs/$run_id"
 	echo "URL da Action: $action_url"
 }
 
@@ -668,7 +786,7 @@ get_organization_repo_name() {
 delete_failed_runs() {
 	local result
 	local clean
-	local REPO="$(get_organization_repo_name)"
+	local REPO_WORKFLOW="$(get_organization_repo_name)"
 
 	# Confirmar a operação
 	read -p "${PURPLE}Digite --confirm para confirmar: " clean
@@ -682,7 +800,7 @@ delete_failed_runs() {
 	runs=$(curl -s -X GET \
 		-H "Accept: application/vnd.github.v3+json" \
 		-H "Authorization: token $TOKEN_RELEASE" \
-		"https://api.github.com/repos/${REPO}/actions/runs")
+		"https://api.github.com/repos/${REPO_WORKFLOW}/actions/runs")
 
 	#  # Imprimir o JSON bruto para depuração
 	#echo "JSON bruto recebido:"
@@ -707,7 +825,7 @@ delete_failed_runs() {
 			response=$(curl -s -X DELETE \
 				-H "Accept: application/vnd.github.v3+json" \
 				-H "Authorization: token $TOKEN_RELEASE" \
-				"https://api.github.com/repos/${REPO}/actions/runs/$run_id")
+				"https://api.github.com/repos/${REPO_WORKFLOW}/actions/runs/$run_id")
 
 			result="$?"
 			# Verifique a resposta para confirmar a exclusão
@@ -731,7 +849,7 @@ debug_json() {
 	runs=$(curl -s -X GET \
 		-H "Accept: application/vnd.github.v3+json" \
 		-H "Authorization: token $TOKEN_RELEASE" \
-		"https://api.github.com/repos/${REPO}/actions/runs")
+		"https://api.github.com/repos/${REPO_WORKFLOW}/actions/runs")
 
 	# Imprimir o JSON bruto para depuração
 	echo "JSON bruto recebido:"
@@ -756,7 +874,7 @@ debug_json() {
 			response=$(curl -s -X DELETE \
 				-H "Accept: application/vnd.github.v3+json" \
 				-H "Authorization: token $TOKEN_RELEASE" \
-				"https://api.github.com/repos/${REPO}/actions/runs/$run_id")
+				"https://api.github.com/repos/${REPO_WORKFLOW}/actions/runs/$run_id")
 
 			result="$?"
 			# Verifique a resposta para confirmar a exclusão
@@ -910,3 +1028,11 @@ clean_all_tags_on_remote() {
 	sleep 5
 	exit 0
 }
+
+replicate() {
+  local char=${1:-'#'}
+  local nsize=${2:-$(tput cols)}
+  local line
+  printf -v line "%*s" "$nsize" && echo "${line// /$char}"
+}
+export -f replicate

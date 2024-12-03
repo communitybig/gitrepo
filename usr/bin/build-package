@@ -4,7 +4,7 @@
 #
 #  build-package - Wrapper git para o BigCommunity
 #  Created: qui 05 set 2024 00:51:12 -04
-#  Altered: sex 08 nov 2024 12:55:55 -04
+#  Altered: seg 25 nov 2024 23:24:09 -04
 #
 #  Copyright (c) 2024-2024, Tales A. Mendonça <talesam@gmail.com>
 #  Copyright (c) 2024-2024, Vilmar Catafesta <vcatafesta@gmail.com>
@@ -33,7 +33,7 @@
 # system
 declare APP="${0##*/}"
 declare APPDESC="Wrapper git para o BigCommunity"
-declare VERSION="2.1.6" # Versão do script
+declare VERSION="2.1.7" # Versão do script
 : "${reset=$(tput sgr0)}"
 : "${red=$(tput bold)$(tput setaf 196)}"
 LIBRARY=${LIBRARY:-"/usr/share/community/gitrepo/shell"}
@@ -49,9 +49,9 @@ sh_usage() {
 		${red}Uso: ${reset}$APP ${cyan}[opções]${reset}
 
 		    ${cyan}Opções:${reset}
-		      -o|--org|--organization ${orange}<name> ${cyan} # Configura organização de trabalho no Github ${yellow}(default: communitybig)${reset}
-		      -c|--commit          ${orange}<message> ${cyan} # Apenas fazer commit/push ${yellow}obrigátorio mensagem do commit ${reset}
+		      -o|--org|--organization ${orange}<name> ${cyan} # Configura organização no Github ${reset}válidos: communitybig, biglinux, chililinux ${yellow}(default: communitybig)${reset}
 		      -b|--build            ${orange}<branch> ${cyan} # Realizar commit/push e gerar pacote ${reset} branch válidos: ${yellow}testing, stable ${cyan}ou ${yellow}extra ${reset}
+		      -c|--commit          ${orange}<message> ${cyan} # Apenas fazer commit/push ${yellow}obrigátorio mensagem do commit ${reset}
 		      -a|--aur              ${orange}<pacote> ${cyan} # Construir pacote do AUR ${yellow}obrigátorio nome do pacote para construir ${reset}
 		      -n|--nocolor                   ${cyan} # Suprime a impressão de cores ${reset}
 		      -V|--version                   ${cyan} # Imprime a versão do aplicativo ${reset}
@@ -137,12 +137,16 @@ parse_parameters() {
 	done
 
 	if $param_organization_was_supplied; then
-		REPO="${value_organization}/build-package" # Repositório que contém os workflows
-		ORGANIZATION="${REPO%%/*}"                 # default=communitybig
+		REPO_WORKFLOW="${value_organization}/build-package" # Repositório que contém os workflows
+		ORGANIZATION="${REPO_WORKFLOW%%/*}"                 # default=communitybig
 	fi
 
 	get_token_release # Obtem o TOKEN_RELEASE utilizando a função get_token_release
 	check_valid_token
+
+  if $IS_GIT_REPO; then
+    pushd "$REPO_PATH"
+  fi
 
 	if $param_build_was_supplied; then
 		branch_type="$value_build"
@@ -231,7 +235,7 @@ trigger_workflow() {
 		--data "$data" \
 		-w "%{http_code}" \
 		-o /dev/null \
-		"https://api.github.com/repos/${REPO}/dispatches")
+		"https://api.github.com/repos/${REPO_WORKFLOW}/dispatches")
 
 	if [[ "$response" != "204" ]]; then
 		die "$RED" "Erro '$response' ao acionar o workflow. Código de resposta: $response"
@@ -250,9 +254,9 @@ sh_configure_environment() {
 	#set -x
 	#set -e
 
-	declare -g REPO="communitybig/build-package" # Repositório que contém os workflows
-	declare -g ORGANIZATION="${REPO%%/*}"        # communitybig
-	declare -g CFILETOKEN="$HOME/.GITHUB_TOKEN"  # path do arquivo que contem os tokens do github
+	declare -g REPO_WORKFLOW="communitybig/build-package" # Repositório que contém os workflows
+	declare -g ORGANIZATION="${REPO_WORKFLOW%%/*}"        # communitybig
+	declare -g CFILETOKEN="$HOME/.GITHUB_TOKEN"           # path do arquivo que contem os tokens do github
 	declare -g GITHUB_USER_NAME
 
 	declare -g REPO_NAME="$(get_repo_name)"      # Obtém o nome do repositório utilizando a função get_repo_name
