@@ -62,7 +62,18 @@ declare -aG aProfiles=(
 		'https://github.com/talesam/iso-profiles'
 		'https://github.com/vcatafesta/iso-profiles'
 		'Voltar'
-  )
+)
+declare -AG ApiProfiles=(
+  # GitHub Repositories
+  [https://github.com/communitybig/iso-profiles]='https://api.github.com/repos/communitybig/iso-profiles/contents/'
+  [https://github.com/biglinux/iso-profiles]='https://api.github.com/repos/biglinux/iso-profiles/contents/'
+  [https://github.com/chililinux/iso-profiles]='https://api.github.com/repos/chililinux/iso-profiles/contents/'
+  [https://github.com/chililinux/manjaro-iso-profiles]='https://api.github.com/repos/chililinux/manjaro-iso-profiles/contents/'
+  [https://github.com/talesam/iso-profiles]='https://api.github.com/repos/talesam/iso-profiles/contents/'
+  [https://github.com/vcatafesta/iso-profiles]='https://api.github.com/repos/vcatafesta/iso-profiles/contents/'
+  # GitLab Repositories
+  [https://gitlab.manjaro.org/profiles-and-settings/iso-profiles.git]='https://gitlab.manjaro.org/api/v4/projects/profiles-and-settings%2Fiso-profiles/repository/tree'
+)
 declare -aG bigcommunity_build_list=(bigcommunity)
 declare -aG biglinux_build_list=(biglinux biglinux-make-iso-profiles)
 declare -aG chililinux_build_list=(chililinux)
@@ -106,12 +117,6 @@ sh_version() {
 	EOF
 }
 
-get_build_list() {
-  curl -s "https://gitlab.manjaro.org/api/v4/projects/profiles-and-settings%2Fiso-profiles/repository/tree" | \
-  jq -r '.[] | select(.type == "tree") | .name' | \
-  grep -vE '^(shared|grub|temp_repo|.github)$'
-}
-
 # Função para disparar o workflow
 trigger_workflow() {
 	local tmp_branch='stable'
@@ -128,13 +133,13 @@ trigger_workflow() {
   \"client_payload\": { \
     \"distroname\": \"$DISTRONAME\", \
     \"iso_profiles_repo\": \"$ISO_PROFILES_REPO\", \
+    \"build_dir\": \"$BUILD_DIR\", \
     \"edition\": \"$EDITION\", \
     \"manjaro_branch\": \"$MANJARO_BRANCH\", \
     \"community_branch\": \"$BIGCOMMUNITY_BRANCH\", \
     \"biglinux_branch\": \"$BIGLINUX_BRANCH\", \
     \"chililinux_branch\": \"$CHILILINUX_BRANCH\", \
     \"kernel\": \"$KERNEL\", \
-    \"release_tag\": \"$current_datetime\", \
     \"tmate\": $tmate_option \
   }}"
 
@@ -146,6 +151,10 @@ trigger_workflow() {
 		-w "%{http_code}" \
 		-o /dev/null \
 		"https://api.github.com/repos/${REPO_WORKFLOW}/dispatches")
+
+	if [ "$response" == "422" ]; then
+		die "${red}" "Erro $response ao acionar o workflow. Não pode ter mais de 10 entradas no evento ${reset}"
+	fi
 
 	if [ "$response" != "204" ]; then
 		die "${red}" "Erro ao acionar o workflow. Código de resposta: $response${reset}"
@@ -173,8 +182,9 @@ resume_and_build() {
 	echo "Repo Workflow    : ${orange}$REPO_WORKFLOW ${reset}"
 	echo "User Name        : ${orange}$GITHUB_USER_NAME ${reset}"
 	echo "Distroname       : ${orange}$DISTRONAME ${reset}"
-	echo "Edition          : ${orange}$EDITION ${reset}"
 	echo "Iso Profiles repo: ${orange}$ISO_PROFILES_REPO ${reset}"
+	echo "Build dir        : ${orange}$BUILD_DIR ${reset}"
+	echo "Edition          : ${orange}$EDITION ${reset}"
 	echo "Manjaro Branch   : ${orange}$MANJARO_BRANCH ${reset}"
 	echo "Community Branch : ${orange}$BIGCOMMUNITY_BRANCH ${reset}"
 	echo "BigLinux Branch  : ${orange}$BIGLINUX_BRANCH ${reset}"
@@ -217,6 +227,107 @@ get_iso_profiles_repo() {
 	ISO_PROFILES_REPO="${MENU_RESULT}"
 }
 
+get_build_list() {
+  local repo="$1"
+  local api_url="${ApiProfiles[$repo]}"
+
+  # Verifica se o repositório existe no array
+  if [[ -z "$api_url" ]]; then
+    die "${red}" "Erro: Repositório não encontrado no array: $repo ${reset}"
+  fi
+
+  # Faz a requisição e inspeciona a resposta para entender o formato
+	p_log "${cyan}" "Fazendo requisição na API $api_url ${reset}"
+  local response=$(curl -sL "$api_url")
+  sleep 1
+
+  # Verifica se a resposta está vazia ou se ocorreu um erro 404
+  if [[ -z "$response" || "$response" == *"404 Not Found"* ]]; then
+    die "${red}" "Erro: Repositório não encontrado ou erro ao acessar a URL: $repo ${reset}"
+  fi
+
+  # Se o repositório for do GitHub, a estrutura de resposta é diferente
+  if [[ "$api_url" == *"github"* ]]; then
+    # Processa a resposta para GitHub
+    mapfile -t build_list < <(
+      echo "$response" | \
+      jq -r '.[] | select(.type == "dir") | .name' | \
+      grep -vE '^(shared|grub|temp_repo|.github)$'
+    )
+  else
+    # Processa a resposta para GitLab
+    mapfile -t build_list < <(
+      echo "$response" | \
+      jq -r '.[] | select(.type == "tree") | .name' | \
+      grep -vE '^(shared|grub|temp_repo|.github)$'
+    )
+  fi
+
+  # Retorna o array
+  #echo "${build_list[@]}"
+	build_list+=("Voltar")
+	create_menu_with_array "Escolha uma ${yellow}BUILD_LIST${reset} para o ${yellow}${DISTRONAME}${reset}:" build_list[@] "$DISTRONAME"
+	BUILD_DIR="${MENU_RESULT}"
+}
+
+get_edition() {
+  local repo="$1"
+  local dir="$2"
+  local api_url="${ApiProfiles[$repo]}"
+  local response
+
+  # Verifica se o repositório existe no array
+  if [[ -z "$api_url" ]]; then
+    die "${red}" "Erro: Repositório não encontrado no array: $repo ${reset}"
+  fi
+
+  # Se for GitHub, faz a requisição
+  if [[ "$api_url" == *"github"* ]]; then
+    # Faz a requisição para o GitHub
+    p_log "${CYAN}" "Fazendo requisição na API $api_url {NC}"
+    response=$(curl -sL "${api_url}${dir}")
+    sleep 1
+
+    # Verifica se a resposta está vazia ou se ocorreu erro
+    if [[ -z "$response" || "$response" == *"404 Not Found"* ]]; then
+      die "${red}" "Erro: Problema ao acessar o diretório: $dir ${reset}"
+    fi
+
+    # Processamento para GitHub
+    mapfile -t subdirs < <(
+      echo "$response" | \
+      jq -r '.[] | select(.type == "dir") | .name'
+    )
+  elif [[ "$api_url" == *"gitlab"* ]]; then
+    # Faz a requisição para o GitLab com o parâmetro 'path'
+    p_log "${CYAN}" "Fazendo requisição na API $api_url {NC}"
+    response=$(curl -sL "${api_url}?path=${dir}")
+    sleep 1
+
+    # Verifica se a resposta está vazia ou se ocorreu erro
+    if [[ -z "$response" || "$response" == *"404 Not Found"* ]]; then
+      die "${red}" "Erro: Problema ao acessar o repositório: $repo ${reset}"
+    fi
+
+    # Processamento para GitLab
+    # Filtra os diretórios e pega o nome de cada um, excluindo os indesejados
+    mapfile -t subdirs < <(
+      echo "$response" | \
+      jq -r '.[] | select(.type == "tree") | .name' | \
+      grep -vE '^(shared|grub|temp_repo|.github)$'
+    )
+  else
+    die "${red}" "Erro: Repositório desconhecido ${reset}"
+  fi
+
+  # Adiciona a opção "Voltar"
+  subdirs+=("Voltar")
+
+  # Cria o menu com as edições encontradas
+  create_menu_with_array "Escolha uma ${yellow}EDIÇÃO/DE${reset} para o ${yellow}${DISTRONAME}${reset}:" subdirs[@] "$EDITION"
+  EDITION="${MENU_RESULT}"
+}
+
 # Função para obter a edição, usada com menu_create com parametros via string e por array
 get_edition_string() {
   # Determina o array com base na distribuição
@@ -236,7 +347,7 @@ get_edition_string() {
   EDITION="${MENU_RESULT}"
 }
 
-get_edition() {
+get_editionOLD() {
 	local editions_var="${DISTRONAME}_edition"
 # local editions=(${!editions_var[@]})
 
@@ -245,16 +356,6 @@ get_edition() {
 	editions+=("Voltar")
 	create_menu_with_array "Escolha uma ${yellow}EDIÇÃO/DE${reset} para o ${yellow}${DISTRONAME}${reset}:" editions[@] "$EDITION"
 	EDITION="${MENU_RESULT}"
-}
-
-get_build_list() {
-	local build_list_var="${DISTRONAME}_build_list"
-
-  # Usando eval para acessar o conteúdo do array dinamicamente
-  eval "local build_list=(\"\${${build_list_var}[@]}\")"
-	build_list+=("Voltar")
-	create_menu_with_array "Escolha uma ${yellow}BUILD_LIST${reset} para o ${yellow}${DISTRONAME}${reset}:" build_list[@] "$DISTRONAME"
-	BUILD_LIST="${MENU_RESULT}"
 }
 
 get_manjaro_branch() {
@@ -401,7 +502,8 @@ main() {
 				BIGLINUX_BRANCH=stable
 				CHILILINUX_BRANCH=stable
 				KERNEL=lts
-				EDITION=xfce
+				BUILD_DIR=chililinux
+				EDITION=base
 				TAG=$(date "+%Y-%m-%d_%H-%M")
 				TMATE='Sim'
 			elif [[ "$ORGANIZATION" =~ ^(vcatafesta)$ ]]; then
@@ -412,6 +514,7 @@ main() {
 				BIGLINUX_BRANCH=stable
 				CHILILINUX_BRANCH=stable
 				KERNEL=lts
+				BUILD_DIR=chililinux
 				EDITION=xfce
 				TAG=$(date "+%Y-%m-%d_%H-%M")
 				TMATE='Sim'
@@ -423,6 +526,7 @@ main() {
 				BIGLINUX_BRANCH=
 				CHILILINUX_BRANCH=
 				KERNEL=latest
+				BUILD_DIR=manjaro
 				EDITION=xfce
 				TAG=$(date "+%Y-%m-%d_%H-%M")
 				TMATE='Sim'
@@ -434,6 +538,7 @@ main() {
 				BIGLINUX_BRANCH=stable
 				CHILILINUX_BRANCH=
 				KERNEL=latest
+				BUILD_DIR=biglinux
 				EDITION=xfce
 				TAG=$(date "+%Y-%m-%d_%H-%M")
 				TMATE='Sim'
@@ -445,6 +550,7 @@ main() {
 				BIGLINUX_BRANCH=stable
 				CHILILINUX_BRANCH=
 				KERNEL=latest
+				BUILD_DIR=bigcommunity
 				EDITION=xfce
 				TAG=$(date "+%Y-%m-%d_%H-%M")
 				TMATE='Sim'
@@ -475,19 +581,19 @@ main() {
 			  continue
 			fi
 
-			get_edition
-			# Verifica se a opção selecionada foi "Voltar"
-			if [[ $MENU_RESULT == "Voltar" ]]; then
-				continue
-			fi
-
 			get_iso_profiles_repo
 			# Verifica se a opção selecionada foi "Voltar"
 			if [[ $MENU_RESULT == "Voltar" ]]; then
 				continue
 			fi
 
-			get_build_list
+			get_build_list "$ISO_PROFILES_REPO"
+			# Verifica se a opção selecionada foi "Voltar"
+			if [[ $MENU_RESULT == "Voltar" ]]; then
+				continue
+			fi
+
+      get_edition "$ISO_PROFILES_REPO" "$BUILD_DIR"
 			# Verifica se a opção selecionada foi "Voltar"
 			if [[ $MENU_RESULT == "Voltar" ]]; then
 				continue
