@@ -41,11 +41,11 @@ LIBRARY=${LIBRARY:-"/usr/share/community/gitrepo/shell"}
 	echo "${red}=> ERRO FATAL: Não foi possível ler a biblioteca $LIBRARY/gitlib.sh ${reset}"
 	exit 1
 }
-declare -aG bigcommunity_edition=(cinnamon cosmic deepin gnome hyprland kde xfce wmaker)
+declare -aG bigcommunity_edition=(cinnamon cosmic deepin gnome kde xfce wmaker)
 declare -aG biglinux_edition=(base FalaQueEuTeEscuto flisol kde small xivastudio)
 declare -aG chililinux_edition=(base cinnamon cosmic deepin gnome i3 kde xfce wmaker)
 declare -aG manjaro_edition=(architect bladebook gnome gnome-next grub kde kde-dev netinstall nxd xfce)
-declare -aG talesam_edition=(cinnamon cosmic deepin gnome hyprland kde xfce wmaker)
+declare -aG talesam_edition=(cinnamon cosmic deepin gnome kde xfce wmaker)
 declare -aG vcatafesta_edition=(base cinnamon cosmic deepin gnome i3 kde xfce wmaker)
 #
 declare -AG Aorganization=([bigcommunity]='communitybig' [biglinux]='biglinux' [chililinux]='chililinux' [manjaro]='communitybig' [talesam]='talesam' [vcatafesta]='vcatafesta')
